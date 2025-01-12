@@ -29,9 +29,14 @@ RPGMAKER MV / MZ 에 사용되는 파일들을 쉽고 간편하게 처리하는 
 
 이 유틸리티는
 
-1.다음 7가지 확장자의 파일들을 다룹니다.
+1.다음 10가지 확장자의 파일들을 다룹니다.
 
-  ".rpgmvp", ".rpgmvm", ".rpgmvo", ".png_", ".ogg_", ".m4a_", ".json"
+  ".rpgmvp", ".rpgmvm", ".rpgmvo", 
+  
+  ".png_", ".ogg_", ".m4a_", 
+  
+  ".png", ".ogg", ".m4a", ".json"
+
 
 2.Petschko 의 Petschkos RPG-Maker MV & MZ-File Decrypter 에서 영감을 얻고
 
