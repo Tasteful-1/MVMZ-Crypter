@@ -9,7 +9,7 @@ import json
 
 os.environ["PYTHONOPTIMIZE"] = "2"
 
-CURRENT_VERSION = "1.2.0"
+CURRENT_VERSION = "1.3.0"
 
 @dataclass
 class RPGFile:
@@ -794,39 +794,52 @@ class BatchDecrypter:
 				self._process_file(root, output_dir, file, mod_type, decrypter)
 
 	def _process_file(self, source_dir: str, output_dir: str, filename: str, mod_type: str, decrypter: Decrypter) -> None:
-		file_start_time = time.time()  # 파일 처리 시작 시간
+		"""
+		파일을 처리하는 메서드입니다.
+		암호화/복호화 대상 파일이 아닌 경우 원본을 그대로 복사합니다.
+		"""
+		file_start_time = time.time()
 		file_path = os.path.join(source_dir, filename)
 
+		# 원본 확장자 확인
 		original_ext = self._get_original_extension(filename, mod_type)
-		if not original_ext:
-			return
 
 		try:
-			with open(file_path, 'rb') as f:
-				file_content = f.read()
+			if original_ext:  # 암/복호화 대상 파일인 경우
+				with open(file_path, 'rb') as f:
+					file_content = f.read()
 
-			rpg_file = RPGFile(
-				name=os.path.splitext(filename)[0],
-				extension=original_ext,
-				file=file_content
-			)
+				rpg_file = RPGFile(
+					name=os.path.splitext(filename)[0],
+					extension=original_ext,
+					file=file_content
+				)
 
-			def callback(file: RPGFile, error: Optional[Exception]) -> None:
-				if error:
-					print(f"Error processing {filename}: {error}")
-					return
+				def callback(file: RPGFile, error: Optional[Exception]) -> None:
+					if error:
+						print(f"Error processing {filename}: {error}")
+						return
 
-				if file.content:
-					output_filename = f"{file.name}.{file.extension}"
-					output_path = os.path.join(output_dir, output_filename)
-					with open(output_path, 'wb') as f:
-						f.write(file.content)
-					file_end_time = time.time()  # 파일 처리 완료 시간
-					process_time = file_end_time - file_start_time
-					print(f"{mod_type.capitalize()}ed: {output_filename} ({process_time:.2f}초)")
-					self.processed_files += 1  # 처리된 파일 카운터 증가
+					if file.content:
+						output_filename = f"{file.name}.{file.extension}"
+						output_path = os.path.join(output_dir, output_filename)
+						with open(output_path, 'wb') as f:
+							f.write(file.content)
+						file_end_time = time.time()
+						process_time = file_end_time - file_start_time
+						print(f"{mod_type.capitalize()}ed: {output_filename} ({process_time:.2f}초)")
+						self.processed_files += 1
 
-			decrypter.modify_file(rpg_file, mod_type, callback)
+				decrypter.modify_file(rpg_file, mod_type, callback)
+
+			else:  # 암/복호화 대상이 아닌 파일인 경우
+				# 원본 파일을 그대로 복사
+				output_path = os.path.join(output_dir, filename)
+				shutil.copy2(file_path, output_path)
+				file_end_time = time.time()
+				process_time = file_end_time - file_start_time
+				print(f"Copied: {filename} ({process_time:.2f}초)")
+				self.processed_files += 1
 
 		except Exception as e:
 			print(f"Failed to process {filename}: {e}")
