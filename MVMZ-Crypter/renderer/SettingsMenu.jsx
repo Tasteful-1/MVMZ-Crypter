@@ -73,7 +73,7 @@ const SettingsMenu = () => {
           isOpen: true,
 		  size: 'sm',
           title: 'About',
-          content: 'MVMZ Crypter v2.0.0\nDeveloped for RPG Maker MV/MZ'
+          content: 'MVMZ Crypter v2.0.1\nDeveloped for RPG Maker MV/MZ'
         });
       }
     },

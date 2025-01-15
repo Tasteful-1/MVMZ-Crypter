@@ -48,6 +48,7 @@ function App() {
   // 결과 모달 관련 상태 추가
   const [showResultModal, setShowResultModal] = useState(false);
   const [processedFiles, setProcessedFiles] = useState(0);
+  const [error, setError] = useState(null);
 
   // 폴더 스캔 함수
   const scanFolders = useCallback(async () => {
@@ -120,68 +121,6 @@ function App() {
     }
   }, [selectedFolders, selectedOperation, encryptionKey, newEncryptionKey, cleanFolders, gameVersion]);
 
-  // 메시지 핸들러 설정
-  useEffect(() => {
-    if (!window.mvmz) {
-      console.error('MVMZ bridge not initialized');
-      return;
-    }
-
-    const messageHandler = (message) => {
-		if (message.type === 'progress') {
-			const { progress, currentFile } = message.data;
-			
-			setShowProgress(true);
-			setProgress(progress);
-			setCurrentFile(currentFile);
-		  } else if (message.type === 'complete') {
-			const end = Date.now();
-			
-			if (message.data.processedFiles) {
-			  setProcessedFiles(message.data.processedFiles);
-			}
-			setEndTime(end);
-			setIsProcessing(false);
-	
-		if (message.data.processedFiles) {  // 추가
-			setProcessedFiles(message.data.processedFiles);
-		  }
-		 // 추가 데이터 처리
-      	if (message.data.folders) {
-        setAvailableFolders(message.data.folders);
-     	}
-        if (message.data.keys) {
-          const newKeys = new Map();
-          message.data.keys.forEach(({ key, folders }) => {
-            if (folders && folders.length > 0) {
-              newKeys.set(key, folders);
-            }
-          });
-          setFoundKeys(newKeys);
-          if (newKeys.size > 0) {
-            setEncryptionKey([...newKeys.keys()][0]);
-          }
-        }
-        setEndTime(Date.now());
-        setIsProcessing(false);
-      } else if (message.type === 'error') {
-        setIsProcessing(false);
-		setShowResultModal(true);  // 결과 모달 표시
-        setShowProgress(false);
-		setEndTime(Date.now());
-        alert(message.data.message);
-      }
-    };
-
-    const cleanup = window.mvmz.onMessage(messageHandler);
-    return () => {
-      if (cleanup) cleanup();
-      if (window.mvmz.removeListeners) {
-        window.mvmz.removeListeners();
-      }
-    };
-  }, []);
-
   useEffect(() => {
     let intervalId;
     
@@ -214,7 +153,7 @@ function App() {
         setProgress(0);
         setCurrentFile('');
 		// 여기에서 결과 모달을 표시
-        if (processedFiles > 0) {
+        if (processedFiles > 0 && !error) {
           setShowResultModal(true);
         }
       }, 0);
@@ -222,12 +161,75 @@ function App() {
     return () => {
       if (clearProgressTimer) clearTimeout(clearProgressTimer);
     };
-  }, [showProgress, isProcessing, processedFiles]);
+  }, [showProgress, isProcessing, processedFiles, error]);
 
   // 초기 폴더 스캔
   useEffect(() => {
     scanFolders();
   }, [scanFolders]);
+
+  // 메시지 핸들러 설정
+  useEffect(() => {
+    if (!window.mvmz) {
+      console.error('MVMZ bridge not initialized');
+      return;
+    }
+
+    const messageHandler = (message) => {
+		if (message.type === 'progress') {
+			const { progress, currentFile } = message.data;
+
+			setShowProgress(true);
+			setProgress(progress);
+			setCurrentFile(currentFile);
+		  } else if (message.type === 'complete') {
+			const end = Date.now();
+
+			if (message.data.processedFiles) {
+			  setProcessedFiles(message.data.processedFiles);
+			}
+			setEndTime(end);
+			setIsProcessing(false);
+			setError(null); // 성공 시 에러 상태 초기화
+
+		if (message.data.processedFiles) {  // 추가
+			setProcessedFiles(message.data.processedFiles);
+		  }
+		 // 추가 데이터 처리
+      	if (message.data.folders) {
+        setAvailableFolders(message.data.folders);
+     	}
+        if (message.data.keys) {
+          const newKeys = new Map();
+          message.data.keys.forEach(({ key, folders }) => {
+            if (folders && folders.length > 0) {
+              newKeys.set(key, folders);
+            }
+          });
+          setFoundKeys(newKeys);
+          if (newKeys.size > 0) {
+            setEncryptionKey([...newKeys.keys()][0]);
+          }
+        }
+        setEndTime(Date.now());
+        setIsProcessing(false);
+      } else if (message.type === 'error') {
+        setIsProcessing(false);
+        setShowProgress(false);
+		setEndTime(Date.now());
+		setError(message.data.message); // 에러 상태 설정
+        alert(message.data.message);
+      }
+    };
+
+    const cleanup = window.mvmz.onMessage(messageHandler);
+    return () => {
+      if (cleanup) cleanup();
+      if (window.mvmz.removeListeners) {
+        window.mvmz.removeListeners();
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen p-6 select-none bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white">
@@ -236,7 +238,7 @@ function App() {
           <div className="flex justify-between items-center">
             <h1 className="text-xl font-bold flex items-center gap-2 dark:text-slate-300">
               <FolderTree className="w-6 h-6" />
-              MVMZ-Crypter v2.0.0
+              MVMZ-Crypter v2.0.1
             </h1>
             <SettingsMenu />
           </div>
