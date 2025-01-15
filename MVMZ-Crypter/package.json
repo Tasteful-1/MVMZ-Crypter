@@ -1,0 +1,52 @@
+{
+	"name": "mvmz-crypter",
+	"version": "2.0.0",
+	"description": "MVMZ-crypter",
+	"main": "main.js",
+	"author": {
+	  "name": "tasteful-1",
+	  "email": "weline103@gmail.com"
+	},
+	"license": "MIT",
+	"scripts": {
+    "start": "cross-env NODE_ENV=development webpack --config webpack.config.js && electron .",
+    "build:renderer": "cross-env NODE_ENV=production webpack --config webpack.config.js",
+    "build:win": "cross-env NODE_ENV=production npm run build:renderer && electron-builder --win",
+    "clean": "rimraf build renderer/dist"
+	},
+	"build": {
+    "appId": "com.mvmz.crypter",
+    "productName": "MVMZ-crypter",
+    "directories": {
+      "output": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      {
+        "from": ".",
+        "to": ".",
+        "filter": ["renderer/**/*"]
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ],
+    "asar": true
+	},
+	"dependencies": {
+		"lucide-react": "^0.263.1",
+		"react": "^18.2.0",
+		"react-dom": "^18.2.0"
+	},
+	"devDependencies": {
+		"electron": "^27.0.0",
+		"electron-builder": "^24.6.4",
+		"webpack": "^5.89.0",
+		"webpack-cli": "^5.1.4"
+	}
+}
