@@ -11,7 +11,7 @@ import json
 
 os.environ["PYTHONOPTIMIZE"] = "2"
 
-CURRENT_VERSION = "2.0.0"
+CURRENT_VERSION = "2.0.1"
 
 @dataclass
 class RPGFile:
