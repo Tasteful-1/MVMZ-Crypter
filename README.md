@@ -1,4 +1,4 @@
-# MVMZ-Easy-crypter
+# MVMZ-Crypter
 
 RPGMAKER MV / MZ 에 사용되는 파일들을 쉽고 간편하게 처리하는 유틸리티입니다.
 
