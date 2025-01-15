@@ -7,7 +7,7 @@ RPG Maker MV/MZ File Utility
 
 A simple and efficient tool for managing files used in RPG Maker MV and MZ.
 
-This program requires the installation of Python.
+This program requires the installation of ``Python``.
 
 <h2>Features</h2>
 
