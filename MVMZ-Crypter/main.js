@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain} = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const { execFile } = require('child_process');
 
 // GPU 가속 비활성화
 app.disableHardwareAcceleration();
@@ -14,7 +15,7 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1024,
         height: 744,
-        resizable: false,
+        resizable: true,
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
@@ -41,96 +42,94 @@ function createWindow() {
 }
 
 function startPythonProcess() {
-  const scriptPath = isDev
-    ? path.join(__dirname, 'backend/api.py')
-    : path.join(process.resourcesPath, 'backend/api.py');
 
-  pythonProcess = spawn('python', [scriptPath], {
-    stdio: ['pipe', 'pipe', 'pipe']
-  });
+    const scriptPath = isDev
+        ? path.join(__dirname, 'backend/api.exe')
+        : path.join(process.resourcesPath, 'backend/api.exe');
 
-  // Python 표준 출력 처리
-  pythonProcess.stdout.on('data', (data) => {
-    try {
-      const lines = data.toString().split('\n');
-      lines.forEach(line => {
-        if (!line.trim()) return;
+    pythonProcess = spawn(scriptPath, [], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: isDev
+            ? path.dirname(__dirname)
+            : path.dirname(path.dirname(process.execPath))
+    });
 
-        if (line.startsWith('{"type":')) {
-          const message = JSON.parse(line);
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('python-message', message);
-          }
+    pythonProcess.stdout.on('data', (data) => {
+        try {
+            const lines = data.toString().split('\n');
+            lines.forEach(line => {
+                if (!line.trim()) return;
+                if (line.startsWith('{"type":')) {
+                    const message = JSON.parse(line);
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('python-message', message);
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Failed to parse Python output:', e);
         }
-      });
-    } catch (e) {
-      console.error('Failed to parse Python output:', e);
-    }
-  });
-
-  // Python 에러 출력 처리
-  pythonProcess.stderr.on('data', (data) => {
-    console.error(`Python Error: ${data}`);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('python-error', data.toString());
-    }
-  });
+    });
+	pythonProcess.stderr.on('data', (data) => {
+		console.error(`Python Error: ${data}`);
+	  });
 }
 
 // IPC 통신 처리 부분 수정
 ipcMain.handle('python-command', async (event, command) => {
-	if (!pythonProcess) {
-	  throw new Error('Python process not running');
-	}
-
-	return new Promise((resolve, reject) => {
-	  let responseData = '';
-
-	  const messageHandler = (data) => {
-		try {
-		  const lines = data.toString().split('\n');
-		  lines.forEach(line => {
-			if (!line.trim()) return;
-
-			if (line.startsWith('{"type":')) {
-			  const message = JSON.parse(line);
-			  if (message.type === 'complete') {
-				cleanup();
-				resolve(message.data);
-
-				if (mainWindow && !mainWindow.isDestroyed()) {
-				  mainWindow.webContents.send('python-message', message);
+	try {
+	  if (!pythonProcess) {
+		throw new Error('Python process not running');
+	  }
+  
+	  return new Promise((resolve, reject) => {
+		// 타임아웃 설정
+		const timeout = setTimeout(() => {
+		  cleanup();
+		  reject(new Error('Command timed out'));
+		}, 300000);  // 5분
+  
+		// 메시지 핸들러
+		const messageHandler = (data) => {
+		  try {
+			const lines = data.toString().split('\n');
+			lines.forEach(line => {
+			  if (!line.trim()) return;
+			  if (line.startsWith('{"type":')) {
+				const message = JSON.parse(line);
+				if (message.type === 'complete') {
+				  cleanup();
+				  resolve(message.data);
 				}
 			  }
-			} else {
-			  responseData += line + '\n';
-			}
-		  });
-		} catch (e) {
-		  console.error('Failed to parse Python response:', e);
-		}
-	  };
-
-	  const errorHandler = (data) => {
-		reject(new Error(data.toString()));
-	  };
-
-	  const cleanup = () => {
-		pythonProcess.stdout.removeListener('data', messageHandler);
-		pythonProcess.stderr.removeListener('data', errorHandler);
-	  };
-
-	  pythonProcess.stdout.on('data', messageHandler);
-	  pythonProcess.stderr.on('data', errorHandler);
-
-	  pythonProcess.stdin.write(JSON.stringify(command) + '\n');
-
-	  // 타임아웃 시간을 30초로 연장
-	  setTimeout(() => {
-		cleanup();
-		reject(new Error('Command timed out'));
-	  }, 300000);  // 300초
-	});
+			});
+		  } catch (e) {
+			cleanup();
+			reject(e);
+		  }
+		};
+  
+		// 에러 핸들러
+		const errorHandler = (data) => {
+		  cleanup();
+		  reject(new Error(data.toString()));
+		};
+  
+		// 정리 함수
+		const cleanup = () => {
+		  clearTimeout(timeout);
+		  pythonProcess.stdout.removeListener('data', messageHandler);
+		  pythonProcess.stderr.removeListener('data', errorHandler);
+		};
+  
+		pythonProcess.stdout.on('data', messageHandler);
+		pythonProcess.stderr.on('data', errorHandler);
+		pythonProcess.stdin.write(JSON.stringify(command) + '\n');
+	  });
+	} catch (error) {
+	  console.error('Python command failed:', error);
+	  throw error;
+	}
   });
 
 // 앱 생명주기 이벤트 처리
