@@ -29,13 +29,15 @@ Select a directory of decrypted files to encrypt them and output the results to 
 
 You will need to manually input the encryption key for this process.
 
-5. Re-Encryption
+4. Re-Encryption
 
 Select a directory of decrypted files to decrypt them into a temporary folder, then re-encrypt them with a new encryption key.
 
 The re-encrypted files will be saved in the ``re-encrypted`` folder.
 
 You will need to manually input the encryption key only for the re-encryption process.
+
+When handling individual audio files, caution is required just as with decryption.
 
 <h2>Supported File Types</h2>
 
