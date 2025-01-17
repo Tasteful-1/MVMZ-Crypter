@@ -12,20 +12,43 @@ let mainWindow;
 let pythonProcess;
 
 function createWindow() {
+	// 중복 실행 방지
+    const gotTheLock = app.requestSingleInstanceLock();
+    if (!gotTheLock) {
+        app.quit();
+        return;
+    }
+
+    // 두 번째 인스턴스 실행 시 기존 창 활성화
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+
     mainWindow = new BrowserWindow({
         width: 1024,
         height: 744,
-        resizable: true,
+        resizable: false,
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
           preload: path.join(__dirname, 'preload.js'),
           sandbox: true,
-		  devTools: false
+		  devTools: true
         },
         backgroundColor: '#ffffff',
         show: false,
         autoHideMenuBar: true
+    });
+
+    // Ctrl+Shift+I로 개발자 도구 열 수 있도록 설정
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+            mainWindow.webContents.openDevTools();
+            event.preventDefault();
+        }
     });
 
     mainWindow.once('ready-to-show', () => {
@@ -42,38 +65,64 @@ function createWindow() {
 }
 
 function startPythonProcess() {
-
-    const scriptPath = isDev
-        ? path.join(__dirname, 'backend/api.exe')
-        : path.join(process.resourcesPath, 'backend/api.exe');
-
-    pythonProcess = spawn(scriptPath, [], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: isDev
-            ? path.dirname(__dirname)
-            : path.dirname(path.dirname(process.execPath))
-    });
-
-    pythonProcess.stdout.on('data', (data) => {
-        try {
-            const lines = data.toString().split('\n');
-            lines.forEach(line => {
-                if (!line.trim()) return;
-                if (line.startsWith('{"type":')) {
-                    const message = JSON.parse(line);
-                    if (mainWindow && !mainWindow.isDestroyed()) {
-                        mainWindow.webContents.send('python-message', message);
-                    }
-                }
-            });
-        } catch (e) {
-            console.error('Failed to parse Python output:', e);
-        }
-    });
+	console.log('App path:', app.getAppPath());
+	console.log('Resource path:', process.resourcesPath);
+	
+	let scriptPath;
+	if (isDev) {
+	  scriptPath = path.join(__dirname, 'backend', 'api.exe');
+	} else {
+	  scriptPath = path.join(process.resourcesPath, 'backend', 'api.exe');
+	}
+	
+	scriptPath = scriptPath.replace(/\\/g, '/');
+	console.log('Python script path:', scriptPath);
+  
+	// 파일 존재 여부 체크
+	if (!require('fs').existsSync(scriptPath)) {
+	  console.error('Python exe not found at:', scriptPath);
+	  return;
+	}
+  
+	pythonProcess = spawn(scriptPath, [], {
+	  stdio: ['pipe', 'pipe', 'pipe'],
+	  cwd: isDev 
+		? path.dirname(__dirname)
+		: path.dirname(path.dirname(process.execPath)),
+	  windowsHide: false,
+	  shell: true
+	});
+  
+	pythonProcess.stdout.on('data', (data) => {
+	  console.log('Python stdout:', data.toString());
+	  try {
+		const lines = data.toString().split('\n');
+		lines.forEach(line => {
+		  if (!line.trim()) return;
+		  if (line.startsWith('{"type":')) {
+			const message = JSON.parse(line);
+			if (mainWindow && !mainWindow.isDestroyed()) {
+			  mainWindow.webContents.send('python-message', message);
+			}
+		  }
+		});
+	  } catch (e) {
+		console.error('Failed to parse Python output:', e);
+	  }
+	});
+  
 	pythonProcess.stderr.on('data', (data) => {
-		console.error(`Python Error: ${data}`);
-	  });
-}
+	  console.error('Python stderr:', data.toString());
+	});
+  
+	pythonProcess.on('error', (err) => {
+	  console.error('Failed to start Python process:', err);
+	});
+  
+	pythonProcess.on('close', (code) => {
+	  console.log(`Python process exited with code ${code}`);
+	});
+  }
 
 // IPC 통신 처리 부분 수정
 ipcMain.handle('python-command', async (event, command) => {

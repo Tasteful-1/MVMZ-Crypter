@@ -104,7 +104,7 @@ export const KeySlider = ({ foundKeys = new Map(), onKeySelect }) => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              {currentFolders.length} folder{currentFolders.length !== 1 ? 's' : ''}
+              {currentFolders.length} item{currentFolders.length !== 1 ? 's' : ''}
             </span>
             {keyList.length > 1 && (
               <div className="flex items-center gap-1">

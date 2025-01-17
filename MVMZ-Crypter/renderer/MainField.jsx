@@ -1,12 +1,5 @@
-import React, { useState } from 'react';
-import {
-  Search,
-  Unlock,
-  Lock,
-  RefreshCw,
-  X,
-  HelpCircle
-} from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {  Search,  Unlock,  Lock,  RefreshCw,  X,  HelpCircle, error} from 'lucide-react';
 import KeySlider from './KeySlider';
 import ProgressBar from './ProgressBar';
 import { useTheme } from './ThemeContext';
@@ -168,6 +161,56 @@ const MainField = ({
 	const [errorMessage, setErrorMessage] = useState('');
 	const [isButtonShaking, setIsButtonShaking] = useState('');
 	const [showProgress, setShowProgress] = useState(false);
+	const keyInputRef = useRef(null);
+
+  // 에러 메시지가 변경될 때마다 포커스 설정
+  useEffect(() => {
+    if (errorMessage && keyInputRef.current) {
+      keyInputRef.current.focus();
+    }
+  }, [errorMessage, selectedOperation]);
+
+  // Key Input Component
+  const KeyInput = React.forwardRef(({ value, onChange, placeholder, readOnly = false }, ref) => {
+	const { theme } = useTheme();
+	return (
+	  <div className="relative">
+		<input
+		  ref={ref}
+		  type="text"
+		  value={value}
+		  onChange={(e) => onChange(e.target.value)}
+		  readOnly={readOnly}
+		  className={`
+			w-full px-3 py-2 rounded-lg 
+			${theme === 'dark' 
+			  ? 'bg-slate-800/50 border-slate-700 text-slate-200 placeholder-slate-500' 
+			  : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+			}
+			border focus:outline-none focus:ring-2 focus:ring-blue-500
+			transition-colors duration-200
+			${readOnly ? 'bg-opacity-50 cursor-not-allowed' : ''}
+		  `}
+		  placeholder={placeholder}
+		/>
+		{value && !readOnly && (
+		  <button
+			onClick={() => onChange('')}
+			className={`
+			  absolute right-2 top-1/2 -translate-y-1/2
+			  ${theme === 'dark' 
+				? 'text-slate-400 hover:text-slate-300' 
+				: 'text-slate-400 hover:text-slate-600'
+			  }
+			  focus:outline-none
+			`}
+		  >
+			<X className="w-4 h-4" />
+		  </button>
+		)}
+	  </div>
+	);
+  });
 
 	  // 진행 상태가 변경될 때마다 showProgress 업데이트
 	  React.useEffect(() => {
@@ -298,6 +341,7 @@ const MainField = ({
 				Encryption Key
 			</h2>
 			<KeyInput
+				ref={keyInputRef}
 				value={encryptionKey}
 				onChange={setEncryptionKey}
 				placeholder="Enter encryption key"
@@ -308,14 +352,15 @@ const MainField = ({
 		{!isProcessing && selectedOperation === Operation.REENCRYPT && (
 			<div className="space-y-2">
 			<h2 className="text-sm font-semibold dark:text-slate-300">
-				New Encryption Key
+			New Encryption Key
 			</h2>
 			<KeyInput
-				value={newEncryptionKey}
-				onChange={setNewEncryptionKey}
-				placeholder="Enter new encryption key"
+			ref={keyInputRef}
+			value={newEncryptionKey}
+			onChange={setNewEncryptionKey}
+			placeholder="Enter new encryption key"
 			/>
-			</div>
+		</div>
 		)}
 
 		{/* Progress Bar */}

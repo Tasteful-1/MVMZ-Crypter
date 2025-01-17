@@ -1,6 +1,6 @@
 {
 	"name": "mvmz-crypter",
-	"version": "2.0.2",
+	"version": "2.0.3",
 	"description": "MVMZ-crypter",
 	"main": "main.js",
 	"author": {
@@ -11,7 +11,7 @@
 	"scripts": {
 		"start": "cross-env NODE_ENV=development webpack --config webpack.config.js && electron .",
 		"build:renderer": "cross-env NODE_ENV=production webpack --config webpack.config.js",
-		"build:python": "pyinstaller --noconfirm --onefile --windowed --name api --distpath ./backend/dist ./backend/api.py",
+		"build:python": "pyinstaller ./backend/api.spec",
 		"build:win": "cross-env NODE_ENV=production npm run build:renderer && electron-builder --win",
 		"clean": "rimraf build renderer/dist backend/dist",
 		"build": "npm run clean && npm run build:renderer && npm run build:python && npm run build:win"
@@ -22,6 +22,22 @@
     "directories": {
       "output": "build"
     },
+	"files": [
+		"main.js",
+		"preload.js",
+		{
+		  "from": ".",
+		  "to": ".",
+		  "filter": ["renderer/**/*"]
+		}
+	  ],
+	"extraResources": [
+	  {
+	  "from": "backend/dist",
+	  "to": "backend",
+	  "filter": ["**/*"]
+	  }
+	],
 	"win": {
 	"target": "nsis",
 	"icon": "renderer/styles/tools.ico"
@@ -30,24 +46,8 @@
 	"oneClick": false,
 	"allowToChangeInstallationDirectory": true,
 	"createDesktopShortcut": false,
-	"perMachine": false
+	"perMachine": true
   },
-    "files": [
-      "main.js",
-      "preload.js",
-      {
-        "from": ".",
-        "to": ".",
-        "filter": ["renderer/**/*"]
-      }
-    ],
-    "extraResources": [
-      {
-        "from": "backend/dist",
-        "to": "backend",
-        "filter": ["**/*"]
-      }
-    ],
     "asar": true
 	},
 	"dependencies": {
