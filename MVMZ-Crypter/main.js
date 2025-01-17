@@ -36,20 +36,13 @@ function createWindow() {
           contextIsolation: true,
           preload: path.join(__dirname, 'preload.js'),
           sandbox: true,
-		  devTools: true
+		  devTools: false
         },
         backgroundColor: '#ffffff',
         show: false,
         autoHideMenuBar: true
     });
 
-    // Ctrl+Shift+I로 개발자 도구 열 수 있도록 설정
-    mainWindow.webContents.on('before-input-event', (event, input) => {
-        if (input.control && input.shift && input.key.toLowerCase() === 'i') {
-            mainWindow.webContents.openDevTools();
-            event.preventDefault();
-        }
-    });
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
