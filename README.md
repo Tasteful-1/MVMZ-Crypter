@@ -23,6 +23,8 @@ Select a directory of encrypted files to decrypt and output them to the ``decryp
 
 The encryption key is automatically detected and applied during this process—manual input is not required.
 
+But if you want to decrypt folders containing audio files, you need to include an encrypted image or the system.json file into those folders.
+
 3. Encryption
 
 Select a directory of decrypted files to encrypt them and output the results to the ``encrypted`` folder.
