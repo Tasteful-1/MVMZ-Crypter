@@ -17,7 +17,7 @@ The extracted key can also be used for decryption or re-encryption.
 
 2. Decryption
 
-Select a directory of encrypted files to decrypt and output them to the ``decrypted`` folder.
+Select a directory of encrypted files to decrypt in ``encrypted`` folder, and output them to the ``decrypted`` folder.
 
 The encryption key is automatically detected and applied during this process—manual input is not required.
 
@@ -25,13 +25,13 @@ But if you want to decrypt folders containing audio files, you need to include a
 
 3. Encryption
 
-Select a directory of decrypted files to encrypt them and output the results to the ``encrypted`` folder.
+Select a directory of decrypted files to encrypt in ``decrypted`` folder, and output the results to the ``encrypted`` folder.
 
 You will need to manually input the encryption key for this process.
 
 4. Re-Encryption
 
-Select a directory of decrypted files to decrypt them into a temporary folder, then re-encrypt them with a new encryption key.
+Select a directory of encrypted files to decrypt in ``encrypted`` folder, and re-encrypt them with a new encryption key.
 
 The re-encrypted files will be saved in the ``re-encrypted`` folder.
 
