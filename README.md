@@ -1,11 +1,19 @@
 # MVMZ-Crypter
 
-![image](https://github.com/user-attachments/assets/7c56ba5e-5cc9-42c5-9049-32763b6f2dde)
+![image](https://github.com/user-attachments/assets/a6660acd-45d3-4647-aeff-95adb71df350)
 
 
 RPG Maker MV/MZ File Utility
 
 A simple and efficient tool for managing files used in RPG Maker MV and MZ.
+
+<h2>Caution</h2>
+
+This program primarily uses three types of folders that are located alongside the program executable.
+
+These folders are automatically created when you first run the program, so please check them.
+
+However, if you are using the Add List feature, you can safely ignore these folders.
 
 <h2>Features</h2>
 
