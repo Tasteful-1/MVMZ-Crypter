@@ -963,10 +963,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 작업 유형에 맞는 메시지로 로딩 인디케이터 표시
         const operationMessages = {
-            'find-key': '암호화 키 찾는 중...',
-            'decrypt': '파일 복호화 중...',
-            'encrypt': '파일 암호화 중...',
-            'reencrypt': '파일 재암호화 중...'
+            'find-key': 'Finding Encryption Keys...',
+            'decrypt': 'Decrypting Files...',
+            'encrypt': 'Encrypting Files...',
+            'reencrypt': 'Re-encrypting Files...'
         };
         showLoading(operationMessages[activeOperation] || '처리 중...');
 
