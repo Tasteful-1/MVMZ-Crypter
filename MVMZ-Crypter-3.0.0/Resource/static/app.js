@@ -961,7 +961,16 @@ document.addEventListener('DOMContentLoaded', function() {
         startTime = new Date();
         endTime = null;
 
-        // 영역 상태 관리
+        // 작업 유형에 맞는 메시지로 로딩 인디케이터 표시
+        const operationMessages = {
+            'find-key': '암호화 키 찾는 중...',
+            'decrypt': '파일 복호화 중...',
+            'encrypt': '파일 암호화 중...',
+            'reencrypt': '파일 재암호화 중...'
+        };
+        showLoading(operationMessages[activeOperation] || '처리 중...');
+
+        // 기존 코드 유지...
         const foundKeyswrapper = document.getElementById('key-container-wrapper');
         const foundKeysContainer = document.getElementById('found-keys-container');
         const keyInputArea = document.getElementById('key-input-area');
@@ -1019,6 +1028,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function endProcessing(isSuccess = true) {
         isProcessing = false;
         endTime = new Date();
+
+        hideLoading();
 
         // 시작 버튼 활성화
         if (startButton) {
@@ -1137,36 +1148,6 @@ document.addEventListener('DOMContentLoaded', function() {
             additionalInfoElement.classList.remove('hidden');
         }
     }
-
-    // 기존 updateProgress 함수 수정
-    function updateProgress(progress, currentFile) {
-        const progressInfo = {
-            percentage: progress,
-            currentFile: currentFile,
-            processedCount: 0,
-            totalCount: 0
-        };
-        updateProgressUI(progressInfo);
-    }
-
-    // Python API에서 진행 상황 이벤트 리스너
-    window.addEventListener('file-progress', function(event) {
-        const data = event.detail;
-        if (data) {
-            if (data.progress !== undefined) {
-                updateProgressUI({
-                    percentage: data.progress,
-                    currentFile: data.currentFile,
-                    processedCount: data.processedCount || 0,
-                    totalCount: data.totalCount || 0,
-                    timeInfo: data.timeInfo || ''
-                });
-            }
-            if (data.message) {
-                logInfo(data.message, data.isError);
-            }
-        }
-    });
 
     // 이벤트 리스너 설정
     if (operationCards) {
@@ -1419,23 +1400,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-
     // 로딩 인디케이터 함수
-    function showLoading() {
+    function showLoading(messageText) {
         const loadingIndicator = document.getElementById('loading-indicator');
+
+        // 메시지 텍스트가 없으면 기본값 사용
+        const displayMessage = messageText || "처리 중...";
+
+        const loadingHTML = `
+            <div class="bg-slate-800 p-4 rounded-md shadow-lg flex flex-col items-center">
+                <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mb-3"></div>
+                <p class="text-slate-300">${displayMessage}</p>
+            </div>
+        `;
+
         if (loadingIndicator) {
+            loadingIndicator.innerHTML = loadingHTML;
             loadingIndicator.classList.remove('hidden');
         } else {
             // 로딩 인디케이터가 없으면 동적으로 생성
             const newLoadingIndicator = document.createElement('div');
             newLoadingIndicator.id = 'loading-indicator';
-            newLoadingIndicator.className = 'fixed inset-0 flex items-center justify-center bg-slate-900 bg-opacity-50 z-50';
-            newLoadingIndicator.innerHTML = `
-                <div class="bg-slate-800 p-4 rounded-md shadow-lg flex flex-col items-center">
-                    <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mb-3"></div>
-                    <p class="text-slate-300">Scanning folders...</p>
-                </div>
-            `;
+            newLoadingIndicator.className = 'fixed inset-0 flex items-center justify-center bg-slate-900 bg-opacity-70 z-50';
+            newLoadingIndicator.innerHTML = loadingHTML;
             document.body.appendChild(newLoadingIndicator);
         }
     }
