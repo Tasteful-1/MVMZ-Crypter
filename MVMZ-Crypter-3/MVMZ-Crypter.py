@@ -1,6 +1,6 @@
 from Resource.core.WebViewApp import WebViewApp
 
-CURRENT_VERSION = "3.0.1"
+CURRENT_VERSION = "3.0.2"
 
 def main():
     try:
