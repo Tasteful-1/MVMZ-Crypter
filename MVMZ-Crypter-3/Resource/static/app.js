@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
 
     const DEBUG_MODE = false;
-    const version = '3.0.1';
+    const version = '3.0.2';
     // 상태 변수들
     let activeOperation = 'find-key';
     let selectedFolders = [];
@@ -1308,8 +1308,23 @@ document.addEventListener('DOMContentLoaded', function() {
             // 사용자 정의 경로 초기화
             customPathsMap.clear();
 
-            // 새 스캔 시작
-            scanFolders();
+            // 백엔드 경로 매핑 초기화
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.clear_path_mappings()
+                    .then(() => {
+                        logInfo("백엔드 경로 매핑 정보가 초기화되었습니다.");
+                        // 새 스캔 시작
+                        scanFolders();
+                    })
+                    .catch(error => {
+                        logError(`경로 매핑 초기화 중 오류: ${error.message || error}`);
+                        // 에러가 발생해도 스캔은 실행
+                        scanFolders();
+                    });
+            } else {
+                // API가 없으면 그냥 스캔 실행
+                scanFolders();
+            }
         });
     }
 

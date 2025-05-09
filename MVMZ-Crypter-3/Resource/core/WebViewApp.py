@@ -146,6 +146,18 @@ class WebViewAPI:
         self.logger.info(f'폴더 스캔 요청: source={source}')
         return self._execute_command('scan_folders', {'source': source}, '폴더 스캔')
 
+    def clear_path_mappings(self):
+        """경로 매핑 정보를 초기화합니다."""
+        self.logger.info('경로 매핑 정보 초기화')
+        self.path_mappings = {}
+        self.result_suffix = ""
+
+        # MVMZBridge에도 정보 초기화 전달
+        if hasattr(self, 'bridge') and self.bridge:
+            self.bridge.set_path_mappings({}, "")
+
+        return {"success": True}
+
     def find_encryption_key(self, folders):
         """암호화 키 찾기 API"""
         self.logger.info(f'암호화 키 찾기 요청: {len(folders)}개 폴더')
