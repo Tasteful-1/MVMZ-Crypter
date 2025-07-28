@@ -2,8 +2,8 @@ import os
 import sys
 import json
 import shutil
+import platform
 import asyncio
-import logging
 import time
 import threading
 import traceback
@@ -246,6 +246,8 @@ class MVMZBridge:
         self.complete_callback = None
         self.error_callback = None
         self.debug_callback = None
+        
+        self.TEST_DISK_SPACE_ERROR = False  # 디스크 용량 부족 테스트용
 
     def register_callbacks(self, progress=None, complete=None, error=None, debug=None):
         """콜백 함수 등록"""
@@ -405,6 +407,99 @@ class MVMZBridge:
         except Exception as e:
             self.logger.error(f"특수 파일 복사 중 오류: {str(e)}")
 
+    def _check_disk_space(self, target_path, estimated_size_mb=0):
+        """디스크 용량 체크"""
+        try:
+            # 테스트 모드: 강제로 디스크 용량 부족 시뮬레이션
+            if self.TEST_DISK_SPACE_ERROR:
+                self.logger.info("테스트 모드: 디스크 용량 부족 시뮬레이션")
+                error_msg = "Insufficient disk space! Available: 50.0MB, Required: 1500.0MB (TEST MODE)"
+                return False, error_msg
+
+            # 타겟 경로의 디스크 용량 확인
+            if os.path.exists(target_path):
+                disk_path = target_path
+            else:
+                # 경로가 없으면 상위 디렉토리 확인
+                disk_path = os.path.dirname(target_path)
+                while disk_path and not os.path.exists(disk_path):
+                    disk_path = os.path.dirname(disk_path)
+
+                if not disk_path:
+                    disk_path = os.path.expanduser("~")  # 홈 디렉토리로 폴백
+
+            # 디스크 사용량 정보 가져오기
+            total, used, free = shutil.disk_usage(disk_path)
+
+            # MB 단위로 변환
+            free_mb = free / (1024 * 1024)
+            total_mb = total / (1024 * 1024)
+            used_mb = used / (1024 * 1024)
+
+            self.logger.info(f"디스크 용량 체크: 전체 {total_mb:.1f}MB, 사용 {used_mb:.1f}MB, 여유 {free_mb:.1f}MB")
+
+            # 최소 여유 공간 (500MB) + 예상 크기
+            required_mb = 500 + estimated_size_mb
+
+            if free_mb < required_mb:
+                error_msg = f"Insufficient disk space! Available: {free_mb:.1f}MB, Required: {required_mb:.1f}MB"
+                self.logger.error(error_msg)
+                return False, error_msg
+
+            return True, None
+
+        except Exception as e:
+            self.logger.error(f"디스크 용량 체크 중 오류: {str(e)}")
+            # 체크 실패 시 작업 계속 진행 (안전상 true 반환)
+            return True, None
+
+    def _estimate_required_space(self, mapped_folders):
+        """필요한 디스크 공간 추정 (MB 단위)"""
+        try:
+            total_size = 0
+
+            for folder_info in mapped_folders:
+                folder_path = folder_info.get("path", "")
+                folder_type = folder_info.get("type", "folder")
+
+                if folder_type == "file" or os.path.isfile(folder_path):
+                    if os.path.exists(folder_path):
+                        total_size += os.path.getsize(folder_path)
+                else:
+                    # 폴더인 경우 하위 파일들의 크기 합계
+                    for root, _, files in os.walk(folder_path):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            try:
+                                total_size += os.path.getsize(file_path)
+                            except (OSError, IOError):
+                                continue  # 접근할 수 없는 파일은 무시
+
+            # 바이트를 MB로 변환하고 안전 여유분 추가 (1.5배)
+            estimated_mb = (total_size / (1024 * 1024)) * 1.5
+
+            self.logger.info(f"예상 필요 공간: {estimated_mb:.1f}MB")
+            return estimated_mb
+
+        except Exception as e:
+            self.logger.error(f"디스크 공간 추정 중 오류: {str(e)}")
+            return 100  # 기본값으로 100MB 반환
+
+    def _is_disk_space_error(self, error):
+        """디스크 용량 부족 오류인지 확인"""
+        error_str = str(error).lower()
+        disk_space_keywords = [
+            'no space left on device',
+            'disk full',
+            'insufficient disk space',
+            'not enough space',
+            'device full',
+            'out of space',
+            'disk quota exceeded'
+        ]
+
+        return any(keyword in error_str for keyword in disk_space_keywords)
+
     async def process_command(self, command):
         """프론트엔드에서 받은 명령 처리"""
         cmd_type = command.get("type")
@@ -430,6 +525,25 @@ class MVMZBridge:
             # 매핑된 폴더 정보 처리
             mapped_folders = self._prepare_folder_mappings(data)
             data["mapped_folders"] = mapped_folders
+
+            # 디스크 용량 체크 (스캔과 키 찾기 제외)
+            if cmd_type in ["decrypt", "encrypt", "reencrypt"]:
+                # 필요한 공간 추정
+                estimated_space = self._estimate_required_space(mapped_folders)
+
+                # 타겟 디렉토리 결정
+                if cmd_type == "decrypt":
+                    target_dir = self.directories['decrypted']
+                elif cmd_type == "encrypt":
+                    target_dir = self.directories['encrypted']
+                else:  # reencrypt
+                    target_dir = self.directories['re-encrypted']
+
+                # 디스크 용량 체크
+                space_ok, space_error = self._check_disk_space(target_dir, estimated_space)
+                if not space_ok:
+                    self.send_error(f"DISK_SPACE_ERROR: {space_error}")
+                    return {"error": space_error}
 
             # 출력 폴더 정리 (필요한 경우)
             if data.get("cleanFolders", False):
@@ -774,10 +888,17 @@ class MVMZBridge:
                     )
 
                 except Exception as e:
-                    error_msg = f"'{display_name}' 처리 중 오류: {str(e)}"
-                    self.logger.error(error_msg)
-                    self.send_error(error_msg)
-                    return
+                    # 디스크 용량 부족 오류 체크
+                    if self._is_disk_space_error(e):
+                        error_msg = "Operation failed! Please free up additional disk space!"
+                        self.logger.error(f"디스크 용량 부족으로 '{display_name}' 처리 실패")
+                        self.send_error(f"DISK_SPACE_ERROR: {error_msg}")
+                        return
+                    else:
+                        error_msg = f"'{display_name}' 처리 중 오류: {str(e)}"
+                        self.logger.error(error_msg)
+                        self.send_error(error_msg)
+                        return
 
             # 완료 처리
             result = {
@@ -787,8 +908,13 @@ class MVMZBridge:
             self.send_complete(result)
             return result
         except Exception as e:
-            self.logger.error(f"process_decryption 오류: {str(e)}")
-            self.send_error(str(e))
+            if self._is_disk_space_error(e):
+                error_msg = "Operation failed! Please free up additional disk space!"
+                self.logger.error(f"디스크 용량 부족으로 복호화 실패: {str(e)}")
+                self.send_error(f"DISK_SPACE_ERROR: {error_msg}")
+            else:
+                self.logger.error(f"process_decryption 오류: {str(e)}")
+                self.send_error(str(e))
             return {"error": str(e)}
 
     async def process_encryption(self, data):
@@ -854,10 +980,17 @@ class MVMZBridge:
                         f"완료: '{display_name}'"
                     )
                 except Exception as e:
-                    error_msg = f"'{display_name}' 암호화 중 오류: {str(e)}"
-                    self.logger.error(error_msg)
-                    self.send_error(error_msg)
-                    return {"error": str(e)}
+                    # 디스크 용량 부족 오류 체크
+                    if self._is_disk_space_error(e):
+                        error_msg = "Operation failed! Please free up additional disk space!"
+                        self.logger.error(f"디스크 용량 부족으로 '{display_name}' 암호화 실패")
+                        self.send_error(f"DISK_SPACE_ERROR: {error_msg}")
+                        return {"error": error_msg}
+                    else:
+                        error_msg = f"'{display_name}' 암호화 중 오류: {str(e)}"
+                        self.logger.error(error_msg)
+                        self.send_error(error_msg)
+                        return {"error": str(e)}
 
             # 완료 처리
             result = {
@@ -867,8 +1000,13 @@ class MVMZBridge:
             self.send_complete(result)
             return result
         except Exception as e:
-            self.logger.error(f"process_encryption 오류: {str(e)}")
-            self.send_error(str(e))
+            if self._is_disk_space_error(e):
+                error_msg = "Operation failed! Please free up additional disk space!"
+                self.logger.error(f"디스크 용량 부족으로 암호화 실패: {str(e)}")
+                self.send_error(f"DISK_SPACE_ERROR: {error_msg}")
+            else:
+                self.logger.error(f"process_encryption 오류: {str(e)}")
+                self.send_error(str(e))
             return {"error": str(e)}
 
     async def process_reencryption(self, data):
@@ -1039,10 +1177,17 @@ class MVMZBridge:
                         f"완료: '{display_name}'"
                     )
                 except Exception as e:
-                    error_msg = f"'{display_name}' 재암호화 중 오류: {str(e)}"
-                    self.logger.error(error_msg)
-                    self.send_error(error_msg)
-                    return {"error": str(e)}
+                    # 디스크 용량 부족 오류 체크
+                    if self._is_disk_space_error(e):
+                        error_msg = "Operation failed! Please free up additional disk space!"
+                        self.logger.error(f"디스크 용량 부족으로 '{display_name}' 재암호화 실패")
+                        self.send_error(f"DISK_SPACE_ERROR: {error_msg}")
+                        return {"error": error_msg}
+                    else:
+                        error_msg = f"'{display_name}' 재암호화 중 오류: {str(e)}"
+                        self.logger.error(error_msg)
+                        self.send_error(error_msg)
+                        return {"error": str(e)}
                 finally:
                     # 임시 디렉토리 정리
                     if os.path.exists(temp_dir):
@@ -1057,8 +1202,13 @@ class MVMZBridge:
             self.send_complete(result)
             return result
         except Exception as e:
-            self.logger.error(f"process_reencryption 오류: {str(e)}")
-            self.send_error(str(e))
+            if self._is_disk_space_error(e):
+                error_msg = "Operation failed! Please free up additional disk space!"
+                self.logger.error(f"디스크 용량 부족으로 재암호화 실패: {str(e)}")
+                self.send_error(f"DISK_SPACE_ERROR: {error_msg}")
+            else:
+                self.logger.error(f"process_reencryption 오류: {str(e)}")
+                self.send_error(str(e))
             return {"error": str(e)}
 
     async def _count_total_files(self, folder_items):

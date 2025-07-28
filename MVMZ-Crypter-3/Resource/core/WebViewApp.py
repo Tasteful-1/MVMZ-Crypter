@@ -30,6 +30,17 @@ class WebViewAPI:
         self.path_mappings = {}
         self.result_suffix = ""
 
+    def enable_disk_space_test(self, enable=True):
+        """디스크 용량 부족 테스트 모드 활성화/비활성화"""
+        try:
+            self.bridge.TEST_DISK_SPACE_ERROR = enable
+            mode = "활성화" if enable else "비활성화"
+            self.logger.info(f"디스크 용량 부족 테스트 모드 {mode}")
+            return {"success": True, "test_mode": enable}
+        except Exception as e:
+            self.logger.error(f"테스트 모드 설정 중 오류: {str(e)}")
+            return {"error": str(e)}
+
     def set_window(self, window):
         self.window = window
         # window가 설정된 후 콜백 등록 (debug 콜백 추가)
