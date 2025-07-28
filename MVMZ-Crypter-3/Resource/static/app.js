@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
 
-    const DEBUG_MODE = false;
+    const DEBUG_MODE = true;
     const version = '3.0.2';
     // 상태 변수들
     let activeOperation = 'find-key';
@@ -328,6 +328,39 @@ document.addEventListener('DOMContentLoaded', function() {
         //logInfo('애플리케이션 초기화 완료');
         logInfo('MVMZ-Crypter 준비 완료. 작업을 선택하고 시작하세요.');
         updateUIForOperation('find-key', true);
+    }
+
+    function addTestMenuToSettings() {
+        const settingsMenu = document.getElementById('settings-menu');
+        if (!settingsMenu) return;
+
+        // 구분선 추가
+        const separator = document.createElement('div');
+        separator.className = 'border-t border-slate-600 my-1';
+        settingsMenu.appendChild(separator);
+
+        // 테스트 메뉴 항목 추가
+        const testMenuItem = document.createElement('a');
+        testMenuItem.href = '#';
+        testMenuItem.id = 'test-disk-space-menu';
+        testMenuItem.className = 'block px-4 py-2 text-sm text-red-400 hover:bg-slate-700';
+        testMenuItem.textContent = '🧪 Test Disk Space';
+        settingsMenu.appendChild(testMenuItem);
+
+        // 테스트 메뉴에 이벤트 리스너 추가
+        testMenuItem.addEventListener('click', function(e) {
+            e.preventDefault();
+            const content = '디스크 용량 부족 상황을 시뮬레이션하여 테스트할 수 있습니다.<br><br><button id="enable-disk-test" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded mr-2">Enable Test Mode</button><button id="disable-disk-test" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded">Disable Test Mode</button><br><br><span class="text-yellow-400">※ 테스트 모드가 활성화되면 모든 encrypt/decrypt/reencrypt 작업이 디스크 용량 부족 오류를 시뮬레이션합니다.</span>';
+            showInfoModal('Test Disk Space Error', content);
+            settingsMenu.classList.add('hidden');
+            
+            // 버튼 이벤트 추가
+            setTimeout(() => {
+                setupTestButtons();
+            }, 100);
+        });
+
+        logInfo('DEBUG_MODE: 테스트 메뉴가 설정에 추가되었습니다.');
     }
 
     // 에러 케치 함수
@@ -1387,13 +1420,79 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // 디스크 용량 부족 경고 모달 표시 함수
+    function showDiskSpaceWarning(message) {
+        if (!resultModal || !operationNameSpan || !totalFilesSpan || !elapsedTimeSpan) return;
+
+        // 모달 내용을 경고 형태로 변경
+        operationNameSpan.textContent = "Disk Space Warning";
+        totalFilesSpan.parentElement.innerHTML = `
+            <div class="text-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <p class="text-slate-300 text-lg">${message}</p>
+            </div>
+        `;
+        elapsedTimeSpan.parentElement.style.display = 'none';
+
+        // 모달 타이틀 색상을 경고색으로 변경
+        operationNameSpan.parentElement.className = 'text-xl font-bold mb-4 text-red-400';
+
+        resultModal.classList.remove('hidden');
+    }
+
+    // 성공 결과 모달 표시 함수 (기존 함수 수정)
+    function showResultModal(operationName, totalFiles) {
+        if (!resultModal || !operationNameSpan || !totalFilesSpan || !elapsedTimeSpan) return;
+
+        // 모달 내용을 성공 형태로 재설정
+        operationNameSpan.textContent = operationName;
+        operationNameSpan.parentElement.className = 'text-xl font-bold mb-4 text-white';
+
+        totalFilesSpan.parentElement.innerHTML = `
+            <div class="flex justify-between mb-2">
+                <span class="text-slate-400">Processed Files:</span>
+                <span id="total-files" class="font-medium text-white">${totalFiles}</span>
+            </div>
+            <div class="flex justify-between mb-2">
+                <span class="text-slate-400">Elapsed Time:</span>
+                <span id="elapsed-time" class="font-medium text-white"></span>
+            </div>
+        `;
+
+        const newElapsedTimeSpan = document.getElementById('elapsed-time');
+        if (newElapsedTimeSpan) {
+            const elapsedMs = endTime - startTime;
+            const seconds = Math.floor(elapsedMs / 1000);
+            const minutes = Math.floor(seconds / 60);
+
+            if (minutes > 0) {
+                newElapsedTimeSpan.textContent = `${minutes}min ${seconds % 60}sec`;
+            } else {
+                newElapsedTimeSpan.textContent = `${seconds}sec`;
+            }
+        }
+
+        resultModal.classList.remove('hidden');
+    }
+
     // 작업 오류 이벤트 리스너
     window.addEventListener('operation-error', function(event) {
         const data = event.detail;
 
         if (data && data.data) {
             endProcessing(false);
-            logError(`작업 오류: ${data.data.message || '알 수 없는 오류'}`);
+            const errorMessage = data.data.message || '알 수 없는 오류';
+
+            // 디스크 용량 부족 오류인지 확인
+            if (errorMessage.startsWith('DISK_SPACE_ERROR:')) {
+                const actualMessage = errorMessage.replace('DISK_SPACE_ERROR: ', '');
+                showDiskSpaceWarning(actualMessage);
+                logError(`디스크 용량 부족: ${actualMessage}`);
+            } else {
+                logError(`작업 오류: ${errorMessage}`);
+            }
         }
     });
 
@@ -1544,11 +1643,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 설정 버튼 클릭 이벤트
         settingsButton.addEventListener('click', function(e) {
-            e.stopPropagation(); // 이벤트 버블링 방지
+            e.stopPropagation();
             settingsMenu.classList.toggle('hidden');
         });
 
-        // 메뉴 항목별 이벤트
+        // 기본 메뉴 항목들
         const menuItems = {
             'about-menu': {
                 title: 'About MVMZ-Crypter',
@@ -1589,6 +1688,50 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         logInfo('설정 메뉴 초기화 완료');
+    }
+
+    // 테스트 버튼 설정 함수
+    function setupTestButtons() {
+        const enableButton = document.getElementById('enable-disk-test');
+        const disableButton = document.getElementById('disable-disk-test');
+
+        if (enableButton) {
+            enableButton.addEventListener('click', function() {
+                if (window.pywebview && window.pywebview.api) {
+                    window.pywebview.api.enable_disk_space_test(true)
+                        .then(result => {
+                            if (result && result.success) {
+                                logInfo('디스크 용량 부족 테스트 모드 활성화됨');
+                                enableButton.textContent = 'Test Mode ON';
+                                enableButton.classList.remove('bg-red-600', 'hover:bg-red-500');
+                                enableButton.classList.add('bg-yellow-600', 'hover:bg-yellow-500');
+                            }
+                        })
+                        .catch(error => {
+                            logError(`테스트 모드 활성화 실패: ${error}`);
+                        });
+                }
+            });
+        }
+
+        if (disableButton) {
+            disableButton.addEventListener('click', function() {
+                if (window.pywebview && window.pywebview.api) {
+                    window.pywebview.api.enable_disk_space_test(false)
+                        .then(result => {
+                            if (result && result.success) {
+                                logInfo('디스크 용량 부족 테스트 모드 비활성화됨');
+                                enableButton.textContent = 'Enable Test Mode';
+                                enableButton.classList.remove('bg-yellow-600', 'hover:bg-yellow-500');
+                                enableButton.classList.add('bg-red-600', 'hover:bg-red-500');
+                            }
+                        })
+                        .catch(error => {
+                            logError(`테스트 모드 비활성화 실패: ${error}`);
+                        });
+                }
+            });
+        }
     }
 
     // 정보 모달 창 표시 함수
@@ -1942,6 +2085,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     //설정 메뉴 초기화
     initializeSettingsMenu();
+
+    // DEBUG_MODE일 때만 테스트 메뉴 추가
+    if (DEBUG_MODE) {
+        addTestMenuToSettings();
+    }
     // 초기 UI 상태 설정
     initializeApplication();
 });
