@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
 
     const DEBUG_MODE = false;
-    const version = '3.0.2';
+    const version = '3.0.3';
     // 상태 변수들
     let activeOperation = 'find-key';
     let selectedFolders = [];
